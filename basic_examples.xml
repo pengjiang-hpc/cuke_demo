@@ -1,12 +1,11 @@
 <file><text>[Tensor Operations](/basic_examples/tensor_op)
 
-[Tensor Slicing](/basic_examples/tensor_slicing)
+[Tensor Slicing](/pengjiang-hpc/cuke_demo/basic_examples/tensor_slicing.xml)
 
+[Matrix Multiplication](/pengjiang-hpc/cuke_demo/basic_examples/matmul.xml)
 
-[Matrix Multiplication](/basic_examples/matmul)
+[Tensor View](/pengjiang-hpc/cuke_demo/basic_examples/tensor_views.xml)
 
-[Tensor View](/basic_examples/tensor_views)
+[Functions](/pengjiang-hpc/cuke_demo/basic_examples/functions.xml)
 
-[Functions](/basic_examples/functions)
-
-[Tensor Mapping](/basic_examples/tensor_map)</text></file>
+[Tensor Mapping](/pengjiang-hpc/cuke_demo/basic_examples/tensor_map.xml)</text></file>

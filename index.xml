@@ -8,12 +8,12 @@ GitHub repo: https://github.com/parallel-group/cuke
 
 </text><text>### Examples
 
-- [Basic Examples](/basic_examples.xml)
+- [Basic Examples](/pengjiang-hpc/cuke_demo/basic_examples.xml)
 
-- [Data Compression](/data_compression.xml)
+- [Data Compression](/pengjiang-hpc/cuke_demo/data_compression.xml)
 
-- [Graph Embedding](/graph_embedding.xml)
+- [Graph Embedding](/pengjiang-hpc/cuke_demo/graph_embedding.xml)
 
-- [Subgraph Matching](/subgraph_matching.xml)</text><text>The page can be downloaded by clicking the &lt;img src="/static/images/download-minimalistic-svgrepo-com.svg" height="25" /&gt; button, and uploaded next time with &lt;img src="/static/images/upload-svgrepo-com.svg" height="25" /&gt;.
+- [Subgraph Matching](/pengjiang-hpc/cuke_demo/subgraph_matching.xml)</text><text>The page can be downloaded by clicking the &lt;img src="/static/images/download-minimalistic-svgrepo-com.svg" height="25" /&gt; button, and uploaded next time with &lt;img src="/static/images/upload-svgrepo-com.svg" height="25" /&gt;.
 
 Login with 'guest' token to run code.</text></file>
