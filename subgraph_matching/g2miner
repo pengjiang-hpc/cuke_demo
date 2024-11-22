@@ -1,0 +1,397 @@
+<file><code>import inspect
+from pycuke2.asg import *
+
+@new_op
+def intersect(a, b, up=Const(2147483647, 'int32_t')):
+
+    src = inspect.cleandoc("""
+        _intersect(&amp;FIRST_TENSOR, FIRST_SIZE, &amp;SECOND_TENSOR, SECOND_SIZE, UP, &amp;RES_TENSOR[0], &amp;RES_SIZE);
+    """)
+
+    res_size = Var(dtype='int32_t')
+    res_size.attr['is_arg'] = False
+
+    res_tensor = Tensor((4096, ), dtype=a[0].dtype)
+    res_tensor.attr['is_arg'] = False
+    t = inline(src, [('RES_TENSOR', res_tensor), ('RES_SIZE', res_size)], \
+                                [('FIRST_TENSOR', a[0]),  ('FIRST_SIZE', a._size()[0]), \
+                                ('SECOND_TENSOR', b[0]), ('SECOND_SIZE', b._size()[0]), ('UP', up)]  \
+                                )
+    res_tensor = t.at(0)
+    res_size = t.at(1)
+    ret = res_tensor[:res_size]
+    ret.ref_size[0].attr['dynamic_size'] = True
+    ret.attr['is_set'] = True
+    return ret
+
+@new_op
+def difference(a, b, up=Const(2147483647, 'int32_t')):
+
+    src = inspect.cleandoc("""
+        _difference(&amp;FIRST_TENSOR, FIRST_SIZE, &amp;SECOND_TENSOR, SECOND_SIZE, UP, &amp;RES_TENSOR[0], &amp;RES_SIZE);
+    """)
+
+    res_size = Var(dtype='int32_t')
+    res_size.attr['is_arg'] = False
+
+    res_tensor = Tensor((4096, ), dtype=a[0].dtype)
+    res_tensor.attr['is_arg'] = False
+    t = inline(src, [('RES_TENSOR', res_tensor), ('RES_SIZE', res_size)], \
+                                [('FIRST_TENSOR', a[0]),  ('FIRST_SIZE', a._size()[0]), \
+                                ('SECOND_TENSOR', b[0]), ('SECOND_SIZE', b._size()[0]), ('UP', up)]  \
+                                )
+    res_tensor = t.at(0)
+    res_size = t.at(1)
+    ret = res_tensor[:res_size]
+    ret.ref_size[0].attr['dynamic_size'] = True
+    ret.attr['is_set'] = True
+    return ret
+</code><code>import sys
+import numpy as np
+import torch
+import os
+import pycuke2.run
+import pycuke2.codegen.cpu as codegen
+import pycuke2.transform as transform
+from pycuke2.asg import *
+from pycuke2.asg2ir import gen_ir
+from pycuke2.transform import parallelize
+from pycuke2.helpers import ASGTraversal
+
+class fuser:
+    def __init__(self):
+        self.rules = [transform.fuse.basic_rule]
+
+    def __call__(self, node):
+        def action(node, res):
+            for r in self.rules:
+                r(node, res)
+
+        t = ASGTraversal(action)
+        t(node)
+        return node
+
+class parallelize():
+    def __init__(self, dim1, dim2=None):
+        self.rules = []
+        if dim2==None:
+            self.num_group = dim1
+        else:
+            assert(dim2 % 32 == 0)
+            self.num_group = int(dim1 * dim2 / 32)
+
+    def __call__(self, node):
+        transform.parallelize.parallelize_loop(node, self.num_group, [0])
+        return node</code><code>import torch
+import numpy as np
+from itertools import permutations
+
+def parse_query(query):
+    pmtx = None
+    num_node=0
+
+
+    for line in query.splitlines():
+        if line[0]=='v':
+            num_node+=1
+        pmtx = [[0 for y in range(num_node)] for x in range(num_node)]
+
+    for line in query.splitlines():
+        if line[0]=='e':
+            v0 = int(line[2])
+            v1 = int(line[4])
+            pmtx[v0][v1] = 1
+            pmtx[v1][v0] = 1
+    print(type(pmtx))
+    return pmtx
+
+
+def query_info(pmtx):
+    num_edge = 0
+    num_node = len(pmtx)
+    edge_list = []
+    for row_idx in range(0, len(pmtx)):
+        for col_idx in range(0, len(pmtx[row_idx])):
+            item = pmtx[row_idx][col_idx]
+            if item==1 and row_idx&lt;col_idx:
+                edge_list.append([row_idx, col_idx])
+                num_edge+=1
+
+    return num_node, num_edge, edge_list
+
+
+def query_dfs(pmtx):
+    edge_order = []
+
+    def _query_dfs(query_adjlist, cur_node, visited):
+        if cur_node not in visited:
+            visited.add(cur_node)
+            for adj_node in query_adjlist[cur_node]:
+                if [cur_node, adj_node] not in edge_order and [adj_node, cur_node] not in edge_order:
+                    edge_order.append([cur_node, adj_node])
+                _query_dfs(query_adjlist, adj_node, visited)
+
+    query_adjlist = []
+
+    for row_idx in range(0, len(pmtx)):
+        this_list = []
+        for col_idx in range(0, len(pmtx[row_idx])):
+            if pmtx[row_idx][col_idx]==1:
+                this_list.append(col_idx)
+
+        query_adjlist.append(this_list)
+
+    _query_dfs(query_adjlist, 0, set())
+    return edge_order
+
+
+def symmetry_breaking(pmtx):
+    num_node = len(pmtx)
+    perms = list(permutations(list(range(num_node))))
+
+    valid_perms = []
+    for perm in perms:
+        mapped_adj = [None for x in range(num_node)]
+        for i in range(num_node):
+            tp = set()
+            for j in range(num_node):
+                if pmtx[i][j]==0:
+                    continue
+                tp.add(perm[j])
+            mapped_adj[perm[i]] = tp
+
+        valid = True
+        for i in range(num_node):
+            equal = True
+            count = 0
+            for j in range(num_node):
+                if pmtx[i][j]==1:
+                    count+=1
+                    if j not in mapped_adj[i]:
+                        equal=False
+
+            if not equal or count!=len(mapped_adj[i]):
+                valid = False
+                break
+
+        if valid==True:
+            valid_perms.append(perm)
+
+    partial_orders = [[0 for y in range(num_node)] for x in range(num_node)]
+    for i in range(num_node):
+        stabilized_aut = []
+        for perm in valid_perms:
+            if perm[i]==i:
+                stabilized_aut.append(perm)
+            else:
+                partial_orders[perm[i]][i]=1
+
+        valid_perms = stabilized_aut
+
+
+    res = [-1 for x in range(num_node)]
+    for i in range(num_node):
+        largest_idx = -1
+        for j in range(num_node):
+            if partial_orders[i][j]==1 and j&gt;largest_idx:
+                largest_idx = j
+
+        res[i] = largest_idx
+    # print("partial orders:")
+    # print(res)
+    return res
+</code><code>def G2MinerVertex(pmtx):
+
+    partial_orders = symmetry_breaking(pmtx)
+    pattern_size = len(pmtx)
+
+    num_node =  Var(name='num_node', dtype='int32_t')
+    num_edge =  Var(name='num_edge', dtype='int64_t')
+    num_jobs =  Var(name='num_jobs', dtype='int64_t')
+
+    rowptr = Tensor((num_node,), dtype='int64_t', name='rowptr')
+    colidx = Tensor((num_edge,), dtype='int32_t', name='colidx')
+    edge_list =  Tensor((num_jobs, 2), dtype='int32_t', name='edge_list')
+
+    class _G2MinerVertex:
+
+        def __init__(self, level, *path):
+             self.level = level
+             self.path = list(*path)
+
+        def __call__(self, item):
+
+            if self.level==2:
+                v0 = item[0]
+                v1 = item[1]
+                v0_nb =  colidx[rowptr[v0]:rowptr[v0+1]]
+                v1_nb =  colidx[rowptr[v1]:rowptr[v1+1]]
+                nb = pmtx[self.level]
+
+                if partial_orders[self.level]!=-1:
+                    all_path = [v0, v1]
+                    up = all_path[partial_orders[self.level]]
+                else:
+                    up = Const(2147483647, 'int32_t')
+
+                if nb[0]==1 and nb[1]==1:
+                    candidate_set = intersect(v0_nb, v1_nb, up)
+                elif nb[0]==0 and nb[1]==1:
+                    candidate_set = difference(v1_nb, v0_nb, up)
+                elif nb[0]==1 and nb[1]==0:
+                    candidate_set = difference(v0_nb, v1_nb, up)
+
+                if self.level == pattern_size-1:
+                    return candidate_set.size(0)
+                else:
+                    return candidate_set.apply(_G2MinerVertex(self.level+1, [v0, v1])).sum()
+            else:
+                all_path = self.path + [item]
+                nb = pmtx[self.level]
+
+                first_nb_idx= 0
+                last_nb_idx= 0
+                for i in range(len(all_path)):
+                    if nb[i]!=0:
+                        first_nb_idx = i
+                        break
+                for i in range(len(all_path)):
+                    if nb[i]!=0:
+                        last_nb_idx = i
+                first_node = all_path[first_nb_idx]
+                candidate_set = colidx[rowptr[first_node]:rowptr[first_node+1]]
+
+                if partial_orders[self.level]!=-1:
+                    up = all_path[partial_orders[self.level]]
+                else:
+                    up = Const(2147483647, 'int32_t')
+
+                for i in range(len(all_path)):
+                    if i==first_nb_idx:
+                        continue
+                    v =  all_path[i]
+                    v_nb =  colidx[rowptr[v]:rowptr[v+1]]
+                    if nb[i]==1:
+                        if i==len(all_path)-1:
+                            candidate_set = intersect(candidate_set, v_nb, up)
+                        else:
+                            candidate_set = intersect(candidate_set, v_nb, Const(2147483647, 'int32_t'))
+                    else:
+                        if i==len(all_path)-1:
+                            candidate_set = difference(candidate_set, v_nb, up)
+                        else:
+                            candidate_set = difference(candidate_set, v_nb, Const(2147483647, 'int32_t'))
+
+                if self.level == pattern_size-1:
+                    return candidate_set.size(0)
+                else:
+                    return candidate_set.apply(_G2MinerVertex(self.level+1, self.path + [item])).sum()
+
+    transform.passes = [fuser(), parallelize(64)]
+    res = edge_list.apply(_G2MinerVertex(2)).sum()
+    code = pycuke2.codegen.cpu.print_cpp(gen_ir(res))
+    print(code)</code><code>def G2MinerEdge(pmtx):
+
+    symmetry = symmetry_breaking(pmtx)
+    pattern_size = len(pmtx)
+
+    num_node =  Var(name='num_node', dtype='int32_t')
+    num_edge =  Var(name='num_edge', dtype='int64_t')
+    num_jobs =  Var(name='num_jobs', dtype='int64_t')
+
+    rowptr = Tensor((num_node,), dtype='int64_t', name='rowptr')
+    colidx = Tensor((num_edge,), dtype='int32_t', name='colidx')
+    edge_list =  Tensor((num_jobs, 2), dtype='int32_t', name='edge_list')
+
+    class _G2MinerEdge:
+
+        def __init__(self, level, *path):
+             self.level = level
+             self.path = list(*path)
+
+        def __call__(self, item):
+
+            if self.level==2:
+                v0 = item[0]
+                v1 = item[1]
+
+                v0_nb =  colidx[rowptr[v0]:rowptr[v0+1]]
+                v1_nb =  colidx[rowptr[v1]:rowptr[v1+1]]
+                nb = pmtx[self.level]
+
+                if symmetry[self.level]!=-1:
+                    all_path = [v0, v1]
+                    up = all_path[symmetry[self.level]]
+                else:
+                    up = Const(2147483647, 'int32_t')
+
+                if nb[0]==1 and nb[1]==1:
+                    candidate_set = intersect(v0_nb, v1_nb, up)
+                elif nb[0]==0 and nb[1]==1:
+                    candidate_set = v1_nb
+                elif nb[0]==1 and nb[1]==0:
+                    candidate_set = v0_nb
+
+                if self.level == pattern_size-1:
+                    cond = candidate_set.apply(lambda vn: vn.neq(v0) &amp; vn.neq(v1))
+                    return candidate_set.apply(lambda node: node, cond=cond).size(0)
+                else:
+                    cond = candidate_set.apply(lambda v2: v2.neq(v0) &amp; v2.neq(v1))
+                    return candidate_set.apply(_G2MinerEdge(self.level+1, [v0, v1]), cond=cond).sum()
+            else:
+                all_path = self.path + [item]
+                nb = pmtx[self.level]
+
+                if symmetry[self.level]!=-1:
+                    up = all_path[symmetry[self.level]]
+                else:
+                    up = Const(2147483647, 'int32_t')
+
+                candidate_set=None
+                for i in range(len(all_path)):
+                    v =  all_path[i]
+                    v_nb =  colidx[rowptr[v]:rowptr[v+1]]
+                    if nb[i]==1:
+                        if candidate_set==None:
+                            candidate_set = colidx[rowptr[v]:rowptr[v+1]]
+                        else:
+                            candidate_set = intersect(candidate_set, v_nb, up)
+
+                def deduplicate(vn):
+                    for i in range(len(all_path)):
+                        vi = all_path[i]
+                        if i==0:
+                            res = vn.neq(vi)
+                        else:
+                            res = res &amp; vn.neq(vi)
+                    return res
+
+                if self.level == pattern_size-1:
+                    cond = candidate_set.apply(lambda vn: deduplicate(vn))
+                    return candidate_set.apply(lambda node: Const(1), cond=cond).sum()
+                else:
+                    cond = candidate_set.apply(lambda vn: deduplicate(vn))
+                    return candidate_set.apply(_G2MinerEdge(self.level+1, self.path + [item]), cond=cond).sum()
+
+    if symmetry[1]!=-1:
+        cond = edge_list.apply(lambda edge: edge[0]&gt;edge[1])
+        res = edge_list.apply(_G2MinerEdge(2), cond = cond).sum()
+    else:
+        res = edge_list.apply(_G2MinerEdge(2)).sum()
+
+    transform.passes = [fuser(), parallelize(64)]
+    code = pycuke2.codegen.cpu.print_cpp(gen_ir(res))
+
+    print(code)</code><code>q1 = """# t 0
+v 0 4
+v 1 2
+v 2 3
+v 3 1
+e 0 1 1
+e 0 2 1
+e 1 2 1
+e 0 3 1"""
+
+pmtx = parse_query(q1)
+print(G2MinerEdge(pmtx))
+#print(G2MinerVertex(pmtx))</code></file>

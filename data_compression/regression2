@@ -1,0 +1,24 @@
+<file><code>from pycuke.cir.op2ir import op2ir
+from pycuke.lang.operators import new_var, new_tensor, einsum, mk_slice, mk_list
+from pycuke.lang.operators import map as cmap
+from pycuke.lang.types import DataType
+from pycuke.codegen.cpu import pytorch_tensor</code><code>dim_size = new_var(dtype=DataType.INT32, name='dim_size')
+block_size = dim_size * dim_size * dim_size
+nblocks = new_var(dtype=DataType.INT32, name='nblocks', init=1024 // block_size + 1)
+input = new_tensor((1024,), name='input', dtype=DataType.FLOAT32)
+input = input.view((nblocks, dim_size, dim_size, dim_size), [0, 0, 0, 0])
+quant_res = (input * 1000).round()
+
+tmp1 = cmap(lambda x: einsum('ijk,i-&gt;', x, mk_slice(1, dim_size, 1)), (quant_res, ), (0, ))
+tmp2 = cmap(lambda x: einsum('ijk,j-&gt;', x, mk_slice(1, dim_size, 1)), (quant_res, ), (0, ))
+tmp3 = cmap(lambda x: einsum('ijk,k-&gt;', x, mk_slice(1, dim_size, 1)), (quant_res, ), (0, ))
+tmp4 = cmap(lambda x: einsum('ijk,-&gt;', x, None), (quant_res, ), (0, ))
+
+
+tmp = tmp1 + tmp2
+coefficient1 = tmp + tmp3
+coefficient2 = tmp + tmp4
+res = mk_list(coefficient1, coefficient2)
+op2ir(res.proc)
+code = pytorch_tensor.print_main(res.proc)
+print(''.join(code))</code></file>

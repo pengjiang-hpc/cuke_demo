@@ -1,0 +1,79 @@
+<file><text># Tensor Map</text><code>from pycuke.codegen.cpu import pytorch_tensor
+from pycuke.lang.operators import new_var, new_tensor, einsum, new_op, new_func
+from pycuke.lang.types import DataType
+from pycuke.lang import operators
+from pycuke.cir import op2ir</code><text>## Example 1
+
+In this example, we define two tensor (&lt;tt&gt;B&lt;/tt&gt;, &lt;tt&gt;C&lt;/tt&gt;) of length &lt;tt&gt;d1&lt;/tt&gt;. Then, we use the &lt;tt&gt;map&lt;/tt&gt; operator to apply a user-defined function &lt;tt&gt;f&lt;/tt&gt; to each element of the input tensors. </text><code>def test1():
+    d1 = new_var(DataType.INT32)
+    B = new_tensor((d1,))
+    C = new_tensor((d1,))
+
+    def f(x, y):
+        return x + y
+
+
+    res = operators.map(f, (B, C), (0, 0))
+
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test1()</code><code>def test2():
+    d1 = new_var(DataType.INT32)
+    d2 = new_var(DataType.INT32)
+    A = new_tensor((d1, d2))
+    B = new_tensor((d1,))
+    C = new_tensor((d1,))
+
+    f1 = new_func(new_func(new_op(lambda x, y: x + y)))
+
+    D = operators.map(f1, (B, C), (0, 0))
+
+    f2 = new_func(new_func(new_op(new_func(lambda x: x + D))))
+
+    res = operators.map(f2, (A,), (1,))
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test3():
+    d1 = new_var(DataType.INT32)
+    d2 = new_var(DataType.INT32)
+    A = new_tensor((d1, d2))
+    B = new_tensor((d2,))
+    C = new_tensor((d2,))
+    D = B + C
+
+    res = operators.map(new_func(new_op(new_func(new_op(lambda x: x + D)))), (A,), (0,))
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test4():
+    d1 = new_var(DataType.INT32)
+    d2 = new_var(DataType.INT32)
+    A = new_tensor((d1, d2))
+    B = new_tensor((d1,))
+    C = new_tensor((d1,))
+    D = B + C
+
+    res = operators.map(new_func(new_func(new_op(new_func(new_op(lambda x: x + D))))), (A,), (1,))
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test5():
+    d1 = new_var(DataType.INT32)
+    d2 = new_var(DataType.INT32)
+    A = new_tensor((d1, d2))
+    B = new_tensor((d1,))
+    C = new_tensor((d1,))
+
+    res = operators.map(new_func(new_func(new_op(new_func(new_op(lambda x: x + B + C))))), (A,), (1,))
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))</code></file>

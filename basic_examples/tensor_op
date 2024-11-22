@@ -1,0 +1,247 @@
+<file><text># Basic Tensor Operations
+
+This is a simple example showing how to define basic tensor computations in Cuke. </text><text>First, we need to import the data types and operators from the &lt;tt&gt;pycuke&lt;/tt&gt; package. </text><code>from pycuke.lang.types import DataType
+# new_var creates a scalar variable, new_tensor creates a tensor
+from pycuke.lang.operators import new_var, new_tensor
+# op2ir generates the IR from ASG
+from pycuke.cir import op2ir
+# pytorch_tensor generates PyTorch C++ code from IR
+from pycuke.codegen.cpu import pytorch_tensor</code><text>## Example 1
+
+In the first example, we use &lt;tt&gt;new_var&lt;/tt&gt; to create a variable &lt;tt&gt;n&lt;/tt&gt;, which is then passed to &lt;tt&gt;new_tensor&lt;/tt&gt; as the first dimension size to create a new tensor &lt;tt&gt;m&lt;/tt&gt;. </text><code>n = new_var(DataType.INT32)
+m = new_tensor((n, 2))</code><text>The tensor &lt;tt&gt;m&lt;/tt&gt; is indexed by a integer &lt;tt&gt;i&lt;/tt&gt;, and the value of &lt;tt&gt;m[i]&lt;/tt&gt; is added with another tensor &lt;tt&gt;t&lt;/tt&gt;.</text><code>i = new_var(DataType.INT32)
+t = new_tensor(m[i].size)
+res = m[i] + t</code><text>To generate C++ code for the computation, we first use &lt;tt&gt;op2ir&lt;/tt&gt; to generate the intermediate representation, and then call &lt;tt&gt;print_main&lt;/tt&gt; function to output the C++ code. </text><code>op2ir.op2ir(res.proc)
+code = pytorch_tensor.print_main(res.proc)
+print(''.join(code))</code><text>To visualize the abstract syntax tree, we can use the &lt;tt&gt;show_AST&lt;/tt&gt; function:</text><code>from pycuke.utils import vis
+vis.show_AST(res.proc)</code><text>Each node in the plot represents an operator, and the nodes it points to represent the data it uses as input. In this example, the node on the top &lt;tt&gt;arr14:BinaryElementWiseTensorOp&lt;/tt&gt; means the output of our program is stored in &lt;tt&gt;arr14&lt;/tt&gt;, and the output is produced by a &lt;tt&gt;BinaryElementWiseTensorOp&lt;/tt&gt;. This operator uses two tensors as inputs: the first one is a &lt;tt&gt;TensorIndexing&lt;/tt&gt;, and the second one is &lt;tt&gt;arr13:CreateTensor&lt;/tt&gt;.</text><text>## Example 2</text><code>def test2():
+    A = new_tensor((10, 2, 2))
+    i = new_var(DataType.INT32)
+    j = new_var(DataType.INT32)
+    t = new_tensor(A[i][j].size)
+
+    res = A[i][j] + t
+
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test2()</code><text>## Example 3</text><code>def test3():
+    A = new_tensor((10,))
+    i = new_var(DataType.INT32)
+    t = new_var(A.dtype)
+
+    res = new_var(init=A[i] + t)
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+    
+test3()</code><code>def test4():
+    A = new_tensor((10, 20))
+    B = new_tensor((10, 20))
+    res = A[1:3][1] + B[2:4][0] - 1
+
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test5():
+    A = new_tensor((10,))
+    idx = new_tensor((5,), dtype=DataType.INT64)
+    t = new_tensor(A[idx].size)
+
+    res = A[idx] + t
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test6():
+    A = new_tensor((10, 10))
+    idx = new_tensor((5,), dtype=DataType.INT64)
+    t = new_tensor(A[idx].size)
+
+    res = A[idx] + t
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test7():
+    A = new_tensor((10, 10))
+    idx = new_tensor((5,), dtype=DataType.INT64)
+
+    res = A[0][idx] + 1
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test8():
+    A = new_tensor((10, 10))
+    i = new_tensor((5,), dtype=DataType.INT64)
+    j = new_tensor((4,), dtype=DataType.INT64)
+    t = new_tensor(A[i][j].size)
+
+    res = A[i][j] + t
+
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+
+def test9():
+    A = new_tensor((10, 10))
+    i = new_tensor((5,), dtype=DataType.INT64)
+    j = new_tensor((4,), dtype=DataType.INT64)
+    t = new_tensor(A[i][:, j].size)
+
+    res = A[i][:, j] + t
+
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+
+def test10():
+    A = new_tensor((10, 11, 12))
+    i = new_tensor((5,), dtype=DataType.INT64)
+    x = new_var(DataType.INT32)
+    j = new_tensor((4,), dtype=DataType.INT64)
+    t = new_tensor(A[i, j, x].size)
+
+    res = A[i, j, x] + t
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+
+def test11():
+    A = new_tensor((10, 11, 12))
+    i = new_tensor((5,), dtype=DataType.INT64)
+    x = new_var(DataType.INT32)
+    j = new_tensor((4,), dtype=DataType.INT64)
+    t = new_tensor(A[i][:, j][x].size)
+
+    res = A[i][:, j][x] + t
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+
+def test12():
+    A = new_tensor((10, 11, 12))
+    i = new_tensor((5,), dtype=DataType.INT64)
+    x = new_var(DataType.INT32)
+    j = new_tensor((4,), dtype=DataType.INT64)
+    t = new_tensor(A[i][:, j][:, x].size)
+
+    res = A[i][:, j][:, x] + t
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+
+def test13():
+    A = new_tensor((10, 11, 12))
+    i = new_tensor((5,), dtype=DataType.INT64)
+    x = new_var(DataType.INT64)
+    j = new_tensor((4,), dtype=DataType.INT64)
+    t = new_tensor(A[i][:, j][:, :, x].size)
+
+    res = A[i][:, j][:, :, x] + t
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test14():
+    A = new_tensor((10, 11, 12))
+    i = new_tensor((5,), dtype=DataType.INT64)
+    x = new_tensor((3,), DataType.INT64)
+    j = new_tensor((4,), dtype=DataType.INT64)
+    t = new_tensor(A[i][:, j][:, :, x].size)
+
+    res = A[i][:, j][:, :, x] + t
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test15():
+    A = new_tensor((10, 11, 12))
+    i = new_tensor((5,), dtype=DataType.INT64)
+    x = new_tensor((3,), DataType.INT64)
+    j = new_tensor((4,), dtype=DataType.INT64)
+    t = new_tensor(A[:, i][:, j][:, :, x].size)
+
+    res = A[:, i][:, j][:, :, x] + t
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test16():
+    A = new_tensor((10, 11, 12), name='a')
+    i = new_tensor((5,), dtype=DataType.INT64, name='i')
+    x = new_var(DataType.INT64, name='x')
+    y = new_var(DataType.INT64, name='y')
+    j = new_tensor((y,), dtype=DataType.INT64, name='j')
+    t = new_tensor(A[:, i][x][:, j].size, name='t')
+
+    res = A[:, i][x][:, j] + t
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test17():
+    s1 = new_var(DataType.INT32, 's1')
+    s2 = new_var(DataType.INT32, 's2')
+    s3 = new_var(DataType.INT32, 's3')
+    A = new_tensor((s1, s2, s3), name='A')
+    b1 = new_var(DataType.INT32, 'b1')
+    v1 = new_tensor((b1,), dtype=DataType.INT64, name='v1')
+    b2 = new_var(DataType.INT64, name='b2')
+    v2 = new_tensor((b2,), dtype=DataType.INT64, name='v2')
+    x = new_var(DataType.INT32, name='x')
+    t = new_tensor(A[v1][:, v2][:, :, x].size, name='t')
+
+    res = A[v1][:, v2][:, :, x] + t
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+
+    print(''.join(code))
+
+
+def test18():
+    s1 = new_var(DataType.INT32)
+    s2 = new_var(DataType.INT32)
+    A = new_tensor((s1, s2))
+    b1 = new_var(DataType.INT32)
+    v1 = new_tensor((b1,), dtype=DataType.INT64)
+    v2 = new_tensor((b1,), dtype=DataType.INT64)
+    x = new_var(DataType.INT32)
+    t = new_tensor(A[v1 + v2][:, x].size)
+
+    res = A[v1 + v2][:, x] + t
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+def test19():
+    s1 = new_var(DataType.INT32, name='s1')
+    A = new_tensor((s1,), dtype=DataType.INT32, name='A')
+    B = new_tensor((A[0], A[1]), name='B')
+    C = new_tensor(B.size, name='C')
+
+    res = B + C
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))</code></file>

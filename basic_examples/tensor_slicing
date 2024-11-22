@@ -1,0 +1,54 @@
+<file><text># Slicing Tensors</text><text>Cuke supports tensor slicing with a syntax similar to PyTorch and Numpy. </text><code>from pycuke.codegen.cpu import pytorch_tensor
+from pycuke.lang.operators import new_var, new_tensor
+from pycuke.lang.types import DataType
+from pycuke.lang import operators
+from pycuke.cir import op2ir</code><text>## Example 1
+
+In this example, we create two tensors of dimension 100*20 and slice their first dimension from index-1 to index-10. The slices are added together to get the &lt;tt&gt;res&lt;/tt&gt;.</text><code>def test1():
+    A = new_tensor((100, 20))
+    B = new_tensor((100, 20))
+
+    res = A[1:10] + B[1:10]
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+    
+test1()</code><code>def test2():
+    A = new_tensor((100, 20))
+    B = new_tensor((100, 20))
+
+    res = A[1:10][2:4] + B[1:10][2:4]
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test2()
+
+def test3():
+    A = new_tensor((100, 20))
+    B = new_tensor((100,), dtype=DataType.INT32)
+
+    res = A[1:30][B[2:4]] + A[1:30][B[1:3]]
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test3()
+
+
+def test4():
+    A = new_tensor((100, 20))
+    B = new_tensor((100,), dtype=DataType.INT32)
+
+    res = A[1:30][:, B[2:4]] + A[1:30][:, B[1:3]]
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+    
+test4()</code><code>def test5():
+    A = new_tensor((100,), dtype=DataType.FLOAT32)
+    x = new_var(dtype=DataType.FLOAT32, init=10)
+    res = A + x
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))</code></file>

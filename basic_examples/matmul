@@ -1,0 +1,53 @@
+<file><text># Matrix Multiplication</text><code>from pycuke.codegen.cpu import pytorch_tensor
+from pycuke.lang.operators import new_var, new_tensor, einsum
+from pycuke.lang.types import DataType
+from pycuke.lang import operators
+from pycuke.cir import op2ir</code><code>def test1():
+    d1 = new_var(DataType.INT32, 'd1')
+    d2 = new_var(DataType.INT32, 'd2')
+    d3 = new_var(DataType.INT32, 'd3')
+    A = new_tensor((d1, d2))
+    B = new_tensor((d2, d3))
+    res = A @ B
+
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test1()</code><code>def test2():
+    d1 = new_var(DataType.INT32, 'd1')
+    d2 = new_var(DataType.INT32, 'd2')
+    A = new_tensor((d1,))
+    B = new_tensor((d2,))
+    res = einsum('i,j-&gt;ij', A, B)
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test2()
+
+def test3():
+    d1 = new_var(DataType.INT32, 'd1')
+    d2 = new_var(DataType.INT32, 'd2')
+    d3 = new_var(DataType.INT32, 'd3')
+    d4 = new_var(DataType.INT32, 'd4')
+    A = new_tensor((d1, d2, d3))
+    B = new_tensor((d1, d3, d4))
+    res = einsum('bij,bjk-&gt;ik', A, B)
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test3()
+
+
+def test4():
+    d = 20
+    A = new_tensor((d,))
+    B = new_tensor((d,))
+    res = einsum('i,i-&gt;', A, B)
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test4()</code></file>

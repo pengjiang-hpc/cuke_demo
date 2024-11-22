@@ -1,0 +1,102 @@
+<file><text># Tensor Views
+
+Cuke supports the reshaping of tensors without moving actual data. The functionality is similar to the &lt;tt&gt;view&lt;/tt&gt; operator in PyTorch.</text><code>from pycuke.codegen.cpu import pytorch_tensor
+from pycuke.lang.operators import new_var, new_tensor
+from pycuke.lang.types import DataType
+from pycuke.lang import operators
+from pycuke.cir import op2ir</code><text>## Example 1
+
+In this example, we create a one-dimensional tensor &lt;tt&gt;data&lt;/tt&gt; of 1024 elements. We divide the data into 16 blocks of size 64. The &lt;tt&gt;view&lt;/tt&gt; is then added to another tensor of the same size. </text><code>def test1():
+    data = new_tensor((1024,))
+    view = data.view((16, 64), (0, 0))
+    i = new_var(dtype=DataType.INT32, name='i')
+
+    tmp1 = view[i]
+    tmp2 = new_tensor(tmp1.size)
+    res = tmp1 + tmp2
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+    
+test1()</code><code>def test2():
+    data = new_tensor((1024,))
+    view1 = data.view((16, 64), (0, 0))
+    i = new_var(dtype=DataType.INT32, name='i')
+
+    tmp1 = view1[i]
+    tmp2 = new_tensor(tmp1.size)
+
+    view2 = (tmp1 + tmp2).view((4, 16), (0, 0))
+
+    k = new_var(dtype=DataType.INT32, name='k')
+    tmp3 = view2[k]
+    tmp4 = new_tensor(tmp3.size)
+    res = tmp3 + tmp4
+
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test2()
+
+def test3():
+    data = new_tensor((1024,))
+    view1 = data.view((16, 64), (0, 0))
+    i = new_var(dtype=DataType.INT32, name='i')
+
+    tmp1 = view1[:, i]
+
+    view2 = tmp1.view((4, 4), (0, 0))
+
+    k = new_var(dtype=DataType.INT32, name='k')
+    tmp2 = view2[k]
+    tmp3 = new_tensor(tmp2.size)
+    res = tmp2 + tmp3
+
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test3()
+
+def test4():
+    data = new_tensor((1024,))
+    view1 = data.view((16, 64), (0, 0))
+    i = new_var(dtype=DataType.INT32, name='i')
+
+    tmp1 = view1[:, i]
+
+    view2 = tmp1.view((4, 4), (0, 0))
+
+    k = new_var(dtype=DataType.INT32, name='k')
+    tmp2 = view2[:, k]
+    tmp3 = new_tensor(tmp2.size)
+    res = tmp2 + tmp3
+
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test4()</code><code>def test5():
+    data = new_tensor((1024,))
+    view1 = data.view((16, 8, 8), (0, 0, 0))
+    i = new_var(DataType.INT32, name='i')
+
+    tmp1 = view1[i]
+    tmp2 = new_tensor(tmp1.size)
+    res = tmp1 + tmp2
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test5()
+
+def test6():
+    t = new_tensor((10,))
+    t = t.view((2, 5), (0, 0))
+    res = t + 1
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+    
+test6()</code></file>

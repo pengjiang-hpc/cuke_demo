@@ -1,0 +1,14 @@
+<file><code>from pycuke.cir.op2ir import op2ir
+from pycuke.lang.operators import new_var, new_tensor, einsum, mk_slice, mk_list
+from pycuke.lang.operators import map as cmap
+from pycuke.lang.types import DataType
+from pycuke.codegen.cpu import pytorch_tensor</code><code>block_size = new_var(dtype=DataType.INT32, name='block_size')
+nblocks = new_var(dtype=DataType.INT32, name='nblocks', init=1024/block_size)
+input = new_tensor((1024,), name='input', dtype=DataType.FLOAT32)
+input = input.view((nblocks, block_size), [0, 0])
+quant_res = (input * 1000).round()
+res = cmap(lambda x: einsum('i,i-&gt;', x, mk_slice(1, block_size, 1)), (quant_res, ), (0, ))
+
+op2ir(res.proc)
+code = pytorch_tensor.print_main(res.proc)
+print(''.join(code))</code></file>

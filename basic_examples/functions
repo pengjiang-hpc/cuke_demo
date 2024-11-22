@@ -1,0 +1,119 @@
+<file><text># Function Definition
+
+Cuke supports the definition of functions. There are two types of functions: inline procedures and standalone functions. Functions open the opportunity to support a much broader range of algorithms with features such as high-order functions. Inline procedures are also commonly used to define customized operators, which simplify optimizations such as operator fusion. </text><code>from pycuke.codegen.cpu import pytorch_tensor
+from pycuke.lang.operators import new_var, new_tensor, einsum, new_op, new_func
+from pycuke.lang.types import DataType
+from pycuke.lang import operators
+from pycuke.cir import op2ir</code><text>## Example 1</text><code>def test1():
+    @new_op
+    def f(a, b):
+        return a + b
+
+    @new_func
+    def g(a, b):
+        return f(a, b) + a * b
+
+    A = new_tensor((10,), name='A')
+    B = new_tensor((10,), name='B')
+    C = new_tensor((10,), name='C')
+
+    res = g(A + B, C)
+
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+test1()
+</code><code>def test2():
+    @new_func
+    def square(x):
+        return x * x
+
+    @new_func
+    def sum_of_squares(x, y):
+        return square(x) + square(y)
+
+    @new_func
+    def f(x):
+        return sum_of_squares(x + 1, x + 2)
+
+    t = new_var(DataType.FLOAT32)
+    res = f(t)
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test3():
+    @new_func
+    def square(x):
+        return x * x
+
+    @new_op
+    def sum_of_squares(x, y):
+        return square(x) + square(y)
+
+    @new_func
+    def f(x):
+        return sum_of_squares(x + 1, x + 2)
+
+    t = new_var(DataType.FLOAT32)
+    res = f(t)
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+
+def test4():
+    f = new_func(lambda x, y: x + y)
+    n = new_var(DataType.INT32)
+    A = new_tensor((n, ))
+    B = new_tensor((n, ))
+    res = f(A[0], B[0])
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+def test5():
+    f = new_func(lambda x, y: x + y)
+    n = new_var(DataType.INT32)
+    A = new_tensor((n, ))
+    B = new_tensor((n, ))
+    i = new_var(DataType.INT32)
+    res = f(A[i], B[i])
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+
+def test6():
+    f = new_func(new_op(new_func(lambda x, y: x + y)))
+    n = new_var(DataType.INT32)
+    m = new_var(DataType.INT32)
+    A = new_tensor((n, m))
+    B = new_tensor((n, m))
+    i = new_var(DataType.INT32)
+    res = f(A[i], B[i])
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+
+
+
+def test7():
+    f = new_func(new_op(new_func(new_op(lambda x, y: x + y))))
+    n = new_var(DataType.INT32)
+    m = new_var(DataType.INT32)
+    p = new_var(DataType.INT32)
+    A = new_tensor((n, m, p))
+    B = new_tensor((n, m, p))
+    i = new_var(DataType.INT32)
+    j = new_var(DataType.INT32)
+    res = f(A[i,:,j], B[i,:,j])
+    op2ir.op2ir(res.proc)
+    code = pytorch_tensor.print_main(res.proc)
+    print(''.join(code))
+</code></file>

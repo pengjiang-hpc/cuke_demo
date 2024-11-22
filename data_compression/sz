@@ -1,0 +1,19 @@
+<file><code>from pycuke.cir.op2ir import op2ir
+from pycuke.lang.operators import new_var, new_tensor, einsum, mk_slice, mk_list
+from pycuke.lang.operators import map as cmap
+from pycuke.lang.types import DataType
+from pycuke.codegen.cpu import pytorch_tensor</code><text>We initialize a 1d array and use absolute error bound 1E-3 to do the quantization and lorenzo.</text><code># Initialize the input and the parameters
+input_size = new_var(dtype=DataType.INT32, name='input_size', init=1024)
+block_size = new_var(dtype=DataType.INT32, name='block_size', init=32)
+nblocks = new_var(dtype=DataType.INT32, name='nblocks', init=1024/block_size)
+recipPrecision = new_var(dtype=DataType.FLOAT32, name='recipPrecision', init=0.5/0.001)
+
+input = new_tensor((nblocks, block_size), name='input', dtype=DataType.FLOAT32)
+
+quant = (input * recipPrecision).round()
+
+res = quant[:, 0:32] - quant[:, -1:31]
+
+op2ir(res.proc)
+code = pytorch_tensor.print_main(res.proc)
+print(''.join(code))</code></file>

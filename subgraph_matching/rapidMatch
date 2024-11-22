@@ -1,0 +1,130 @@
+<file><code>import sys
+import numpy as np
+import torch
+import os
+
+import pycuke2.run
+import pycuke2.codegen.cpu as codegen
+import pycuke2.transform as transform
+from pycuke2.asg import *
+from pycuke2.asg2ir import gen_ir
+from pycuke2.transform import parallelize
+from pycuke2.helpers import ASGTraversal
+import inspect
+from pycuke2.asg import *
+
+class parallelize():
+    def __init__(self, dim1, dim2=None):
+        self.rules = []
+        if dim2==None:
+            self.num_group = dim1
+        else:
+            assert(dim2 % 32 == 0)
+            self.num_group = int(dim1 * dim2 / 32)
+
+    def __call__(self, node):
+        transform.parallelize.parallelize_loop(node, self.num_group, [0])
+        return node
+
+class fuser:
+    def __init__(self):
+        self.rules = [transform.fuse.basic_rule]
+
+    def __call__(self, node):
+        def action(node, res):
+            for r in self.rules:
+                r(node, res)
+        t = ASGTraversal(action)
+        t(node)
+        return node
+
+@new_op
+def intersect(a, b, up=Const(2147483647, 'int32_t')):
+
+    src = inspect.cleandoc("""
+        _intersect(&amp;FIRST_TENSOR, FIRST_SIZE, &amp;SECOND_TENSOR, SECOND_SIZE, UP, &amp;RES_TENSOR[0], &amp;RES_SIZE);
+    """)
+
+    res_size = Var(dtype='int32_t')
+    res_size.attr['is_arg'] = False
+
+    res_tensor = Tensor((4096, ), dtype=a[0].dtype)
+    res_tensor.attr['is_arg'] = False
+    t = inline(src, [('RES_TENSOR', res_tensor), ('RES_SIZE', res_size)], \
+                                [('FIRST_TENSOR', a[0]),  ('FIRST_SIZE', a._size()[0]), \
+                                ('SECOND_TENSOR', b[0]), ('SECOND_SIZE', b._size()[0]), ('UP', up)]  \
+                                )
+    res_tensor = t.at(0)
+    res_size = t.at(1)
+    ret = res_tensor[:res_size]
+    ret.ref_size[0].attr['dynamic_size'] = True
+    ret.attr['is_set'] = True
+    return ret</code><code>@new_op
+def hashkey(vid, indPtr):
+    src = inspect.cleandoc("""
+    _hash(VID, INDPTR, KEY);
+    """)
+    key = Var(dtype='int64_t')
+    key.attr['is_arg'] = False
+    key = inline(src, [('KEY', key)], [('INDPTR', indPtr), ('VID', vid)])
+    return key.at(0)
+
+class LoopFilter:
+    def __init__(self, *path):
+        self.path = list(*path)
+    def __call__(self, vn):
+        for i in range(len(self.path)):
+            vi = self.path[i]
+            if i==0:
+                res = vn.neq(vi)
+            else:
+                res = res &amp; vn.neq(vi)
+        return res
+
+def RapidMatchQ1():
+
+    num_node =  Var(name='num_node', dtype='int32_t')
+    num_edge =  Var(name='num_edge', dtype='int64_t')
+
+    nbr02 = Tensor((num_node,), dtype='int32_t', name='nbr02')
+    nbr12 = nbr02
+    nbr03 = Tensor((num_edge,), dtype='int32_t', name='nbr03')
+
+    indPtr02 = Tensor((num_node, 3), dtype='int64_t', name='indPtr02')
+    indPtr12 = indPtr02
+    indPtr03 = Tensor((num_node, 3), dtype='int64_t', name='indPtr03')
+
+    L01 =  Tensor((num_edge, 2), dtype='int32_t', name='L01')
+
+    class _rapidmatch:
+
+        def __init__(self, level, path, key, nb):
+            self.level = level
+            self.path = path
+            self.key = key
+            self.nb = nb
+
+        def __call__(self, item):
+            if self.level==2:
+                v0 = item[0]
+                v1 = item[1]
+                v0_k = hashkey(v0, indPtr02)
+                v1_k = hashkey(v1, indPtr12)
+                v0_nb =  nbr02[indPtr02[v0_k][1]:indPtr02[v0_k][2]]
+                v1_nb =  nbr12[indPtr12[v1_k][1]:indPtr12[v1_k][2]]
+
+                cv2 = intersect(v0_nb, v1_nb)
+                return cv2.apply(_rapidmatch(self.level+1, [v0, v1], [v0_k, v1_k], [v0_nb, v1_nb])).sum()
+            if self.level==3:
+                v0 = self.path[0]
+                v0_k = hashkey(v0, indPtr03)
+                v0_nb =  nbr03[indPtr03[v0_k][1]:indPtr03[v0_k][2]]
+
+                cond = v0_nb.apply(LoopFilter(self.path + [item]))
+                return v0_nb.apply(lambda node: node, cond=cond).size(0)
+    transform.passes = [fuser(), parallelize(64)]
+    res = L01.apply(_rapidmatch(2, [], [], [])).sum()
+    code = pycuke2.codegen.cpu.print_cpp(gen_ir(res))
+    return code
+
+print(RapidMatchQ1())</code></file>
