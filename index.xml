@@ -1,7 +1,6 @@
 <file><text># Cuke
 
 Cuke is a source-to-source compiler that translates functional programs written in Python into C++/CUDA code.
-It was originally developed to teach compiler optimization at the University of Iowa and has since evolved into a platform for constructing domain-specific compilers for various applications. 
 
 GitHub repo: https://github.com/parallel-group/cuke 
 
@@ -14,6 +13,4 @@ GitHub repo: https://github.com/parallel-group/cuke
 
 - [Graph Embedding](/pengjiang-hpc/cuke_demo/graph_embedding.xml)
 
-- [Subgraph Matching](/pengjiang-hpc/cuke_demo/subgraph_matching.xml)</text><text>The page can be downloaded by clicking the &lt;img src="/static/images/download-minimalistic-svgrepo-com.svg" height="25" /&gt; button, and uploaded next time with &lt;img src="/static/images/upload-svgrepo-com.svg" height="25" /&gt;.
-
-Login with 'guest' token to run code.</text></file>
+- [Subgraph Matching](/pengjiang-hpc/cuke_demo/subgraph_matching.xml)</text></file>
