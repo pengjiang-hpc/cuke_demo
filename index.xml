@@ -1,7 +1,6 @@
 <file><text># Cuke
 
 Cuke is a source-to-source compiler that translates functional programs written in Python into C++/CUDA code.
-It was originally developed to teach compiler optimization at the University of Iowa and has since evolved into a platform for constructing domain-specific compilers for various applications. 
 
 GitHub repo: https://github.com/parallel-group/cuke 
 
